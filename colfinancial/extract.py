@@ -26,7 +26,7 @@ class Ledger(io.RawIOBase):
 
     def __enter__(self):
         self.leftover = b""
-        files = reversed(list(self.DIR.glob("*.txt")))
+        files = sorted(self.DIR.glob("*.txt"))
         self.fds = list(map(lambda f: open(f, "r"), files))
         self.stream_iter = iter(self.fds)
         try:
