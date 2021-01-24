@@ -28,6 +28,8 @@ import sys
 sys.path.append("..")
 
 from colfinancial.extract import Ledger
-with Ledger() as l:
+with Ledger("LEDGER") as l:
     for line in l.reader():
         print(line)
+
+

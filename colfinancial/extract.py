@@ -14,11 +14,19 @@ class ReadState(Enum):
 
 # Idea from here https://stackoverflow.com/a/50770511
 class Ledger(io.RawIOBase):
-    DIR = Path("C:/Users/kmonisit/Downloads/colfinancial")
+    def __init__(self, ledger_dir):
+        """
+        Parameters
+        ----------
+        ledger_dir : str
+            A directory containing monthly ledgers downloaded from COL
+            Financial
+        """
+        self.DIR = Path(ledger_dir)
 
     def __enter__(self):
         self.leftover = b""
-        files = list(Ledger.DIR.glob("*.txt"))
+        files = reversed(list(self.DIR.glob("*.txt")))
         self.fds = list(map(lambda f: open(f, "r"), files))
         self.stream_iter = iter(self.fds)
         try:
