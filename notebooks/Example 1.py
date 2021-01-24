@@ -27,9 +27,23 @@
 import sys
 sys.path.append("..")
 
+# +
 from colfinancial.extract import Ledger
-with Ledger("LEDGER") as l:
-    for line in l.reader():
-        print(line)
+
+def func():
+    with Ledger("LEDGER") as l:
+        for line in l.reader():
+            yield line
 
 
+# +
+def process(line):
+    try:
+        net = float(line.split(':')[-1].strip().replace(",", ""))
+        return net
+    except ValueError:
+        return 0
+
+import numpy as np
+arr = np.array(list(map(process, func())))
+arr.sum()
