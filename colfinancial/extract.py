@@ -79,7 +79,7 @@ class Ledger(io.RawIOBase):
 
     @staticmethod
     def __is_start_of_txn_table(line):
-        return b"BEGINNING_BALANCE" in line
+        return b"BEGINNING BALANCE" in line
 
     @staticmethod
     def __is_end_of_txn_table(line):
