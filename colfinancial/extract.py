@@ -5,11 +5,13 @@ from pathlib import Path
 
 
 class ReadState(Enum):
-    BEGIN_MONTHLY_LEDGER = 0
-    READ_TXN = 1
-    BETWEEN_TXN = 2
-    END_MONTHLY_LEDGER = 3
-    DONE_MONTHLY_LEDGER = 4
+    BEGIN_ALL = 0
+    BEGIN_MONTHLY_LEDGER = 1
+    READ_TXN = 2
+    BETWEEN_TXN = 3
+    END_MONTHLY_LEDGER = 4
+    BETWEEN_MONTHLY_LEDGER = 5
+    END_ALL = 6
 
 
 # Idea from here https://stackoverflow.com/a/50770511
@@ -63,6 +65,7 @@ class Ledger(io.RawIOBase):
                 self.stream = next(self.stream_iter)
                 self.bar_counter = 0
                 self.FIRST_STREAM = False
+                self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
                 chunk = self.__read_next_chunk(buffer_length)
             except StopIteration:
                 # No more streams to chain together
@@ -93,20 +96,26 @@ class Ledger(io.RawIOBase):
     def __is_end_of_monthly_ledger(line):
         return b"Total Account Equity" in line
 
+    def __read_beginning(self):
+        if self.FIRST_STREAM and (self.read_state != ReadState.BEGIN_MONTHLY_LEDGER):
+            for line in self:
+                if Ledger.__is_horizontal_bar(line):
+                    self.bar_counter += 1
+                if Ledger.__is_start_of_txn_table(line):
+                    # TODO Emit beginning balance data
+                    s = Ledger.__decode_line(line)
+                    self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
+                    yield s
+                    break
+
     def __read_begin_monthly_ledger(self):
         if self.read_state == ReadState.BEGIN_MONTHLY_LEDGER:
             for line in self:
                 if Ledger.__is_horizontal_bar(line):
                     self.bar_counter += 1
-                if self.FIRST_STREAM & Ledger.__is_start_of_txn_table(line):
-                    # TODO Emit beginning balance data
-                    s = Ledger.__decode_line(line)
-                    yield s
                 if self.bar_counter == 3:
                     self.read_state = ReadState.READ_TXN
                     break
-            if self.read_state == ReadState.BEGIN_MONTHLY_LEDGER:
-                raise StopIteration
 
     def __read_txn(self):
         if self.read_state == ReadState.READ_TXN:
@@ -136,17 +145,33 @@ class Ledger(io.RawIOBase):
         if self.read_state == ReadState.END_MONTHLY_LEDGER:
             for line in self:
                 if Ledger.__is_end_of_monthly_ledger(line):
-                    self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
+                    self.read_state = ReadState.BETWEEN_MONTHLY_LEDGER
                     break
 
+    def __read_between_monthly_ledger(self):
+        if self.read_state == ReadState.BETWEEN_MONTHLY_LEDGER:
+            for line in self:
+                if not self.stream:
+                    self.read_state = ReadState.END_ALL
+                if self.read_state == ReadState.BEGIN_MONTHLY_LEDGER:
+                    break
+
+    def __read_end(self):
+        if self.read_state == ReadState.END_ALL:
+            raise StopIteration
+
     def reader(self):
-        self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
+        self.read_state = ReadState.BEGIN_ALL
         while True:
             try:
+                for s in self.__read_beginning():
+                    yield s
                 self.__read_begin_monthly_ledger()
                 for s in self.__read_txn():
                     yield s
                 self.__read_between_txn()
                 self.__read_end_monthly_ledger()
+                self.__read_between_monthly_ledger()
+                self.__read_end()
             except StopIteration:
                 break
