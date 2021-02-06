@@ -36,7 +36,8 @@ class Ledger(io.RawIOBase):
 
            DIR = "./ledger"
            with Ledger(DIR) as ledger:
-               df = pd.DataFrame(data=ledger.reader())
+               rows = list(ledger.reader())
+               df = pd.DataFrame(data=rows)
 
         """
         self.DIR = Path(ledger_dir)
@@ -107,10 +108,6 @@ class Ledger(io.RawIOBase):
         return len(output)
 
     @staticmethod
-    def __decode_line(line):
-        return f"{line.decode('ascii').strip()}"[1:-2]
-
-    @staticmethod
     def __is_horizontal_bar(line):
         s = line.strip()
         return (len(s) > 0) & (s == len(s) * b"-")
@@ -134,9 +131,9 @@ class Ledger(io.RawIOBase):
                     self.bar_counter += 1
                 if Ledger.__is_start_of_txn_table(line):
                     # TODO Emit beginning balance data
-                    s = Ledger.__decode_line(line)
+                    txn = Transaction(line)
                     self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
-                    yield s
+                    yield txn
                     break
 
     def __read_begin_monthly_ledger(self):
