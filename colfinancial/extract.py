@@ -73,6 +73,10 @@ class Ledger(io.RawIOBase):
         return len(output)
 
     @staticmethod
+    def __decode_line(line):
+        return f"{line.decode('ascii').strip()}"[1:-2]
+
+    @staticmethod
     def __is_horizontal_bar(line):
         s = line.strip()
         return (len(s) > 0) & (s == len(s) * b"-")
@@ -96,7 +100,8 @@ class Ledger(io.RawIOBase):
                     self.bar_counter += 1
                 if self.FIRST_STREAM & Ledger.__is_start_of_txn_table(line):
                     # TODO Emit beginning balance data
-                    pass
+                    s = Ledger.__decode_line(line)
+                    yield s
                 if self.bar_counter == 3:
                     self.read_state = ReadState.READ_TXN
                     break
@@ -111,7 +116,7 @@ class Ledger(io.RawIOBase):
                     break
                 else:
                     # TODO Read transaction line atom and emit data
-                    s = f"{line.decode('ascii').strip()}"[1:-2]
+                    s = Ledger.__decode_line(line)
                     yield s
 
     def __read_between_txn(self):
