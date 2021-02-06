@@ -3,6 +3,8 @@ from collections import deque
 from enum import Enum
 from pathlib import Path
 
+from .transaction import Transaction
+
 
 class ReadState(Enum):
     BEGIN_ALL = 0
@@ -23,8 +25,37 @@ class Ledger(io.RawIOBase):
         ledger_dir : str
             A directory containing monthly ledgers downloaded from COL
             Financial
+
+        Example
+        -------
+        Always use this class within a context:
+
+        .. code-block:: python
+
+           import pandas as pd
+
+           DIR = "./ledger"
+           with Ledger(DIR) as ledger:
+               df = pd.DataFrame(data=ledger.reader())
+
         """
         self.DIR = Path(ledger_dir)
+
+    def reader(self):
+        self.read_state = ReadState.BEGIN_ALL
+        while True:
+            try:
+                for s in self.__read_beginning():
+                    yield s
+                self.__read_begin_monthly_ledger()
+                for s in self.__read_txn():
+                    yield s
+                self.__read_between_txn()
+                self.__read_end_monthly_ledger()
+                self.__read_between_monthly_ledger()
+                self.__read_end()
+            except StopIteration:
+                break
 
     def __enter__(self):
         self.leftover = b""
@@ -125,8 +156,8 @@ class Ledger(io.RawIOBase):
                     break
                 else:
                     # TODO Read transaction line atom and emit data
-                    s = Ledger.__decode_line(line)
-                    yield s
+                    txn = Transaction(line)
+                    yield txn
 
     def __read_between_txn(self):
         if self.read_state == ReadState.BETWEEN_TXN:
@@ -159,19 +190,3 @@ class Ledger(io.RawIOBase):
     def __read_end(self):
         if self.read_state == ReadState.END_ALL:
             raise StopIteration
-
-    def reader(self):
-        self.read_state = ReadState.BEGIN_ALL
-        while True:
-            try:
-                for s in self.__read_beginning():
-                    yield s
-                self.__read_begin_monthly_ledger()
-                for s in self.__read_txn():
-                    yield s
-                self.__read_between_txn()
-                self.__read_end_monthly_ledger()
-                self.__read_between_monthly_ledger()
-                self.__read_end()
-            except StopIteration:
-                break
