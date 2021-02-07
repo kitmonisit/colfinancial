@@ -65,7 +65,6 @@ class Ledger(io.RawIOBase):
         try:
             self.bar_counter = 0
             self.stream = next(self.stream_iter)
-            self.FIRST_STREAM = True
         except StopIteration:
             self.stream = None
         return self
@@ -94,7 +93,6 @@ class Ledger(io.RawIOBase):
             try:
                 self.stream = next(self.stream_iter)
                 self.bar_counter = 0
-                self.FIRST_STREAM = False
                 self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
                 chunk = self.__read_next_chunk(buffer_length)
             except StopIteration:
@@ -123,7 +121,7 @@ class Ledger(io.RawIOBase):
         return b"Total Account Equity" in line
 
     def __read_beginning(self):
-        if self.FIRST_STREAM and (self.read_state != ReadState.BEGIN_MONTHLY_LEDGER):
+        if (self.read_state == ReadState.BEGIN_ALL):
             for line in self:
                 if Ledger.__is_horizontal_bar(line):
                     self.bar_counter += 1
