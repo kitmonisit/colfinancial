@@ -5,6 +5,8 @@ from pathlib import Path
 
 from .transaction import Transaction
 
+import numpy as np
+
 
 class ReadState(Enum):
     BEGIN_ALL = 0
@@ -60,7 +62,7 @@ class Ledger(io.RawIOBase):
 
     def __enter__(self):
         self.leftover = b""
-        files = sorted(self.DIR.glob("*.txt"))[:-1]
+        files = sorted(self.DIR.glob("*.txt"))
         self.stream_iter = map(lambda f: open(f, "r"), files)
         try:
             self.bar_counter = 0
@@ -79,6 +81,7 @@ class Ledger(io.RawIOBase):
         if self.leftover:
             return self.leftover
         elif self.stream is not None:
+            # Read 0x10 (16) bytes at a time is fastest
             return self.stream.read(0x10)
         else:
             return b""
@@ -98,6 +101,7 @@ class Ledger(io.RawIOBase):
             except StopIteration:
                 # No more streams to chain together
                 self.stream = None
+                self.read_state = ReadState.END_ALL
                 return 0  # Indicate EOF
         output, self.leftover = chunk[:buffer_length], chunk[buffer_length:]
         b[: len(output)] = bytes(output, encoding="ascii")

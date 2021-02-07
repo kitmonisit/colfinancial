@@ -10,13 +10,6 @@ from pyinstrument import Profiler
 DIR = "./sandbox/LEDGER"
 
 
-def runner():
-    with cf.Ledger(DIR) as ledger:
-        with Profiler() as p:
-            rows = list(ledger.reader())
-    print(p.output_text(color=True))
-    df = pd.DataFrame.from_records(rows)
-    return df
 
 def display(df):
     with pd.option_context(
@@ -32,8 +25,17 @@ def buffer_fn():
     # df = pd.DataFrame.from_records(rows)
     # return df
 
+def runner():
+    with cf.Ledger(DIR) as ledger:
+        with Profiler() as p:
+            rows = list(ledger.reader())
+    print(p.output_text(color=True))
+    df = pd.DataFrame.from_records(rows)
+    return df
+
 if __name__ == "__main__":
     df = runner()
+    print(len(df.index))
     # display(df)
     # buffer_fn()
 
