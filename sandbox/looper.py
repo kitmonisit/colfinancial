@@ -9,33 +9,26 @@ from pyinstrument import Profiler
 
 DIR = "./sandbox/LEDGER"
 
-
-
 def display(df):
     with pd.option_context(
             "display.max_rows", None,
             ):
         print(df)
 
-def buffer_fn():
-    with cf.Ledger(DIR) as ledger:
-        with Profiler() as p:
-            print(ledger.read(1024))
-    print(p.output_text(color=True))
-    # df = pd.DataFrame.from_records(rows)
-    # return df
-
 def runner():
-    with cf.Ledger(DIR) as ledger:
-        with Profiler() as p:
-            rows = list(ledger.reader())
+    with Profiler() as p:
+        ledger = cf.Ledger(DIR)
+        df = ledger.dataframe
     print(p.output_text(color=True))
-    df = pd.DataFrame.from_records(rows)
     return df
 
 if __name__ == "__main__":
     df = runner()
-    print(len(df.index))
-    # display(df)
+    display(df)
+    # looper()
+    # optimize()
+    # print(len(df.index))
     # buffer_fn()
+    # ledger = cf.SingleStream(DIR)
+    # fd = open("./sandbox/LEDGER/202007.txt", "r")
 

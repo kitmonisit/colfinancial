@@ -15,7 +15,7 @@ class Transaction(dict):
 
     @staticmethod
     def __clean_line(line):
-        line = f"{line.decode('ascii').strip()}"[1:-2]
+        line = f"{line.strip()}"[1:-2]
         if ":" not in line:
             out = list(map(lambda s: s.strip().replace(",", ""), line.split()))
             out.insert(1, "START")

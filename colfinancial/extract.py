@@ -1,11 +1,10 @@
 import io
-from collections import deque
+import pandas as pd
+
 from enum import Enum
 from pathlib import Path
 
 from .transaction import Transaction
-
-import numpy as np
 
 
 class ReadState(Enum):
@@ -18,8 +17,49 @@ class ReadState(Enum):
     END_ALL = 6
 
 
+class SingleStream(io.RawIOBase):
+    def readable(self):
+        return True
+
+    def __enter__(self):
+        files = sorted(self.DIR.glob("*.txt"))
+        self.streams_read = 0
+        self.stream = None
+        self.stream_iter = map(lambda f: open(f, "r"), files)
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.close()
+
+    def __next__(self):
+        out = self.readline()
+        if not out:
+            self.stream.close()
+            self.stream = None
+            try:
+                out = self.readline()
+            except StopIteration:
+                self.read_state = ReadState.END_ALL
+        return out
+
+    def readline(self, size=-1):
+        try:
+            out = self.stream.readline()
+            return out
+        except AttributeError:
+            if self.streams_read == 0:
+                self.read_state = ReadState.BEGIN_ALL
+            else:
+                self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
+            self.stream = next(self.stream_iter)
+            self.streams_read += 1
+            self.bar_counter = 0
+            out = self.stream.readline()
+            return out
+
+
 # Idea from here https://stackoverflow.com/a/50770511
-class Ledger(io.RawIOBase):
+class Ledger(SingleStream):
     def __init__(self, ledger_dir):
         """
         Parameters
@@ -34,152 +74,93 @@ class Ledger(io.RawIOBase):
 
         .. code-block:: python
 
-           import pandas as pd
-
            DIR = "./ledger"
-           with Ledger(DIR) as ledger:
-               rows = list(ledger.reader())
-               df = pd.DataFrame(data=rows)
-
+           ledger = Ledger(DIR)
+           df = ledger.dataframe
         """
         self.DIR = Path(ledger_dir)
+        self.dispatch = {
+            ReadState.BEGIN_ALL: self.__read_begin,
+            ReadState.BEGIN_MONTHLY_LEDGER: self.__read_begin_monthly_ledger,
+            ReadState.READ_TXN: self.__read_txn,
+            ReadState.BETWEEN_TXN: self.__read_between_txn,
+            ReadState.BETWEEN_MONTHLY_LEDGER: self.__read_between_monthly_ledger,
+            ReadState.END_MONTHLY_LEDGER: self.__read_end_monthly_ledger,
+            ReadState.END_ALL: self.__read_end,
+        }
 
-    def reader(self):
-        self.read_state = ReadState.BEGIN_ALL
+    @property
+    def dataframe(self):
+        with self:
+            df = pd.DataFrame.from_records(self)
+        return df
+
+    def __next__(self):
         while True:
-            try:
-                for line in self.__read_beginning():
-                    yield Transaction(line)
-                self.__read_begin_monthly_ledger()
-                for line in self.__read_txn():
-                    yield Transaction(line)
-                self.__read_between_txn()
-                self.__read_end_monthly_ledger()
-                self.__read_between_monthly_ledger()
-                self.__read_end()
-            except StopIteration:
-                break
-
-    def __enter__(self):
-        self.leftover = b""
-        files = sorted(self.DIR.glob("*.txt"))
-        self.stream_iter = map(lambda f: open(f, "r"), files)
-        try:
-            self.bar_counter = 0
-            self.stream = next(self.stream_iter)
-        except StopIteration:
-            self.stream = None
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        self.close()
-
-    def readable(self):
-        return True
-
-    def __read_next_chunk(self, max_length):
-        if self.leftover:
-            return self.leftover
-        elif self.stream is not None:
-            # Read 0x10 (16) bytes at a time is fastest
-            return self.stream.read(0x10)
-        else:
-            return b""
-
-    def readinto(self, b):
-        buffer_length = len(b)
-        chunk = self.__read_next_chunk(buffer_length)
-        while len(chunk) == 0:
-            # Move to next stream
-            if self.stream is not None:
-                self.stream.close()
-            try:
-                self.stream = next(self.stream_iter)
-                self.bar_counter = 0
-                self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
-                chunk = self.__read_next_chunk(buffer_length)
-            except StopIteration:
-                # No more streams to chain together
-                self.stream = None
-                self.read_state = ReadState.END_ALL
-                return 0  # Indicate EOF
-        output, self.leftover = chunk[:buffer_length], chunk[buffer_length:]
-        b[: len(output)] = bytes(output, encoding="ascii")
-        return len(output)
+            line = super().__next__()
+            line = self.dispatch[self.read_state](line)
+            if line is not None:
+                # print(f"{str(self.read_state):<30s}", end="")
+                # print(f"{line[-70:-1]:>80s}")
+                return Transaction(line)
 
     @staticmethod
     def __is_horizontal_bar(line):
         s = line.strip()
-        return (len(s) > 0) & (s == len(s) * b"-")
+        return (len(s) > 0) & (s == len(s) * "-")
 
     @staticmethod
     def __is_start_of_txn_table(line):
-        return b"BEGINNING BALANCE" in line
+        return "BEGINNING BALANCE" in line
 
     @staticmethod
     def __is_end_of_txn_table(line):
-        return (b"GAIN(LOSS)" in line) & (b"COST" not in line)
+        return ("GAIN(LOSS)" in line) & ("COST" not in line)
 
     @staticmethod
     def __is_end_of_monthly_ledger(line):
-        return b"Total Account Equity" in line
+        return "Total Account Equity" in line
 
-    def __read_beginning(self):
-        if (self.read_state == ReadState.BEGIN_ALL):
-            for line in self:
-                if Ledger.__is_horizontal_bar(line):
-                    self.bar_counter += 1
-                if Ledger.__is_start_of_txn_table(line):
-                    self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
-                    yield line
-                    break
+    def __read_begin(self, line):
+        if Ledger.__is_horizontal_bar(line):
+            self.bar_counter += 1
+        if Ledger.__is_start_of_txn_table(line):
+            self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
+            return line
 
-    def __read_begin_monthly_ledger(self):
+    def __read_begin_monthly_ledger(self, line):
+        if Ledger.__is_horizontal_bar(line):
+            self.bar_counter += 1
+        if self.bar_counter == 3:
+            self.read_state = ReadState.READ_TXN
+            return None
+
+    def __read_txn(self, line):
+        if Ledger.__is_horizontal_bar(line):
+            self.read_state = ReadState.BETWEEN_TXN
+            self.bar_counter_between_txn = 0
+            return None
+        else:
+            return line
+
+    def __read_between_txn(self, line):
+        if Ledger.__is_horizontal_bar(line):
+            self.bar_counter_between_txn += 1
+        if self.bar_counter_between_txn == 2:
+            self.read_state = ReadState.READ_TXN
+        if Ledger.__is_end_of_txn_table(line):
+            self.read_state = ReadState.END_MONTHLY_LEDGER
+
+    def __read_end_monthly_ledger(self, line):
+        if Ledger.__is_end_of_monthly_ledger(line):
+            self.read_state = ReadState.BETWEEN_MONTHLY_LEDGER
+
+    def __read_between_monthly_ledger(self, line):
+        if not self.stream:
+            self.read_state = ReadState.END_ALL
         if self.read_state == ReadState.BEGIN_MONTHLY_LEDGER:
-            for line in self:
-                if Ledger.__is_horizontal_bar(line):
-                    self.bar_counter += 1
-                if self.bar_counter == 3:
-                    self.read_state = ReadState.READ_TXN
-                    break
+            return None
 
-    def __read_txn(self):
-        if self.read_state == ReadState.READ_TXN:
-            for line in self:
-                if Ledger.__is_horizontal_bar(line):
-                    self.read_state = ReadState.BETWEEN_TXN
-                    break
-                else:
-                    yield line
-
-    def __read_between_txn(self):
-        if self.read_state == ReadState.BETWEEN_TXN:
-            bar_counter = 0
-            for line in self:
-                if Ledger.__is_horizontal_bar(line):
-                    bar_counter += 1
-                if bar_counter == 2:
-                    self.read_state = ReadState.READ_TXN
-                    break
-                if Ledger.__is_end_of_txn_table(line):
-                    self.read_state = ReadState.END_MONTHLY_LEDGER
-                    break
-
-    def __read_end_monthly_ledger(self):
-        if self.read_state == ReadState.END_MONTHLY_LEDGER:
-            for line in self:
-                if Ledger.__is_end_of_monthly_ledger(line):
-                    self.read_state = ReadState.BETWEEN_MONTHLY_LEDGER
-                    break
-
-    def __read_between_monthly_ledger(self):
-        if self.read_state == ReadState.BETWEEN_MONTHLY_LEDGER:
-            for line in self:
-                if not self.stream:
-                    self.read_state = ReadState.END_ALL
-                if self.read_state == ReadState.BEGIN_MONTHLY_LEDGER:
-                    break
-
-    def __read_end(self):
+    def __read_end(self, line):
         if self.read_state == ReadState.END_ALL:
             raise StopIteration
