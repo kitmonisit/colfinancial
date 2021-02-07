@@ -24,6 +24,16 @@ def display(df):
             ):
         print(df)
 
+def buffer_fn():
+    with cf.Ledger(DIR) as ledger:
+        with Profiler() as p:
+            print(ledger.read(1024))
+    print(p.output_text(color=True))
+    # df = pd.DataFrame.from_records(rows)
+    # return df
+
 if __name__ == "__main__":
     df = runner()
+    # display(df)
+    # buffer_fn()
 

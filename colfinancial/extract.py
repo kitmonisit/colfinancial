@@ -60,9 +60,8 @@ class Ledger(io.RawIOBase):
 
     def __enter__(self):
         self.leftover = b""
-        files = sorted(self.DIR.glob("*.txt"))
-        self.fds = list(map(lambda f: open(f, "r"), files))
-        self.stream_iter = iter(self.fds)
+        files = sorted(self.DIR.glob("*.txt"))[:-1]
+        self.stream_iter = map(lambda f: open(f, "r"), files)
         try:
             self.bar_counter = 0
             self.stream = next(self.stream_iter)
@@ -72,8 +71,7 @@ class Ledger(io.RawIOBase):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        deque(map(lambda f: f.close(), self.fds))
-        super().close()
+        self.close()
 
     def readable(self):
         return True
@@ -82,7 +80,7 @@ class Ledger(io.RawIOBase):
         if self.leftover:
             return self.leftover
         elif self.stream is not None:
-            return self.stream.read(max_length)
+            return self.stream.read(0x10)
         else:
             return b""
 
