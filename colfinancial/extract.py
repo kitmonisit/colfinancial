@@ -46,11 +46,11 @@ class Ledger(io.RawIOBase):
         self.read_state = ReadState.BEGIN_ALL
         while True:
             try:
-                for s in self.__read_beginning():
-                    yield s
+                for line in self.__read_beginning():
+                    yield Transaction(line)
                 self.__read_begin_monthly_ledger()
-                for s in self.__read_txn():
-                    yield s
+                for line in self.__read_txn():
+                    yield Transaction(line)
                 self.__read_between_txn()
                 self.__read_end_monthly_ledger()
                 self.__read_between_monthly_ledger()
@@ -130,10 +130,8 @@ class Ledger(io.RawIOBase):
                 if Ledger.__is_horizontal_bar(line):
                     self.bar_counter += 1
                 if Ledger.__is_start_of_txn_table(line):
-                    # TODO Emit beginning balance data
-                    txn = Transaction(line)
                     self.read_state = ReadState.BEGIN_MONTHLY_LEDGER
-                    yield txn
+                    yield line
                     break
 
     def __read_begin_monthly_ledger(self):
@@ -152,9 +150,7 @@ class Ledger(io.RawIOBase):
                     self.read_state = ReadState.BETWEEN_TXN
                     break
                 else:
-                    # TODO Read transaction line atom and emit data
-                    txn = Transaction(line)
-                    yield txn
+                    yield line
 
     def __read_between_txn(self):
         if self.read_state == ReadState.BETWEEN_TXN:
