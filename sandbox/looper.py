@@ -1,25 +1,29 @@
 import sys
-sys.path.append("../")
+sys.path.append("./")
 import pandas as pd
 
 import colfinancial as cf
 from colfinancial.transaction import Transaction, TxnType
 
+from pyinstrument import Profiler
 
-DIR = "../notebooks/LEDGER"
+DIR = "./sandbox/LEDGER"
 
 
 def runner():
     with cf.Ledger(DIR) as ledger:
-        rows = list(ledger.reader())
-        df = pd.DataFrame.from_records(rows)
+        with Profiler() as p:
+            rows = list(ledger.reader())
+    print(p.output_text(color=True))
+    df = pd.DataFrame.from_records(rows)
     return df
 
-df = runner()
+def display(df):
+    with pd.option_context(
+            "display.max_rows", None,
+            ):
+        print(df)
 
-with pd.option_context(
-        "display.max_rows", None,
-        ):
-    print(df)
-
+if __name__ == "__main__":
+    df = runner()
 
