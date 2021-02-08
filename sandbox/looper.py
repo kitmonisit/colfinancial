@@ -2,8 +2,8 @@ import sys
 sys.path.append("./")
 import pandas as pd
 
-import colfinancial as cf
-from colfinancial.transaction import Transaction, TxnType
+import core
+from core.transaction import Transaction, TxnType
 
 from pyinstrument import Profiler
 
@@ -17,7 +17,7 @@ def display(df):
 
 def runner():
     with Profiler() as p:
-        ledger = cf.Ledger(DIR)
+        ledger = core.Ledger(DIR)
         df = ledger.dataframe
     print(p.output_text(color=True))
     return df
@@ -29,6 +29,6 @@ if __name__ == "__main__":
     # optimize()
     # print(len(df.index))
     # buffer_fn()
-    # ledger = cf.SingleStream(DIR)
+    # ledger = core.SingleStream(DIR)
     # fd = open("./sandbox/LEDGER/202007.txt", "r")
 
