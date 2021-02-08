@@ -1,3 +1,3 @@
 #/bin/env bash
 
-jupyter notebook
+clear; python sandbox/looper.py
