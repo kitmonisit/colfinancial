@@ -4,7 +4,7 @@ import pandas as pd
 from enum import Enum
 from pathlib import Path
 
-from .transaction import Transaction
+from .transaction import Transaction, TxnType
 
 
 class ReadState(Enum):
@@ -88,6 +88,7 @@ class Ledger(SingleStream):
             ReadState.END_MONTHLY_LEDGER: self.__read_end_monthly_ledger,
             ReadState.END_ALL: self.__read_end,
         }
+        self.PREVIOUS_SECU = None
 
     @property
     def dataframe(self):
@@ -102,7 +103,13 @@ class Ledger(SingleStream):
             if line is not None:
                 # print(f"{str(self.read_state):<30s}", end="")
                 # print(f"{line[-70:-1]:>80s}")
-                return Transaction(line)
+                out = Transaction(line, previous_secu=self.PREVIOUS_SECU)
+                if self.read_state == ReadState.READ_TXN and out["action"] in (
+                    TxnType.BUY,
+                    TxnType.SELL,
+                ):
+                    self.PREVIOUS_SECU = out["secu"]
+                return out
 
     @staticmethod
     def __is_horizontal_bar(line):

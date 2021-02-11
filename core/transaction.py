@@ -50,6 +50,8 @@ class Transaction(dict):
             return int(s)
         except ValueError:
             return int(0)
+        except TypeError:
+            return None
 
     @staticmethod
     def __float_or_zero(s):
@@ -57,6 +59,8 @@ class Transaction(dict):
             return float(s)
         except ValueError:
             return float(0.0)
+        except TypeError:
+            return None
 
     FORMATTERS = {
         "date": __pass_through.__func__,
@@ -75,7 +79,8 @@ class Transaction(dict):
     }
     KEYS = FORMATTERS.keys()
 
-    def __init__(self, line):
+    def __init__(self, line, *, previous_secu):
+        self.previous_secu = previous_secu
         line_split = Transaction.__clean_line(line)
         action = {
             TxnType.START: self.__make_start_action,
@@ -93,13 +98,17 @@ class Transaction(dict):
     def __make_start_action(self, line_split):
         starting_balance = line_split[-1]
         out = [
-            "",
+            None,
         ] * Transaction.NUM_COLUMNS
         out[1] = "START"
         out[10] = starting_balance
         return out
 
     def __make_stock_action(self, line_split):
+        if line_split[2] == "":  # Empty ref
+            line_split[2] = None
+        if line_split[3] == "":  # Empty secu
+            line_split[3] = self.previous_secu
         return line_split
 
     def __make_div_action(self, line_split):
