@@ -2,6 +2,7 @@ import io
 import pandas as pd
 
 from enum import Enum
+from more_itertools import peekable
 from pathlib import Path
 
 from .transaction import Transaction, TxnType

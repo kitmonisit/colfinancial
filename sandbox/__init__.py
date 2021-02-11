@@ -2,6 +2,7 @@
 # https://stackoverflow.com/questions/2084508/clear-terminal-in-python#comment85748431_2084521
 
 import sys
+from more_itertools import peekable
 
 sys.path.append("./")
 import pandas as pd
@@ -36,9 +37,12 @@ def runner():
 def main():
     clear()
     df = runner()
-    cols = ["date", "secu", "shares", "price", "gross_amount"]
-    cols = df.columns
-    display(df[cols])
+    cols = ["date", "action", "ref", "secu", "shares", "price", "gross_amount"]
+    # cols = df.columns
+    display(df[cols].iloc[50:101])
+    # df_iter = df[cols].iloc[50:101].iterrows()
+    # p = peekable(df_iter)
+    # print(p.peek())
     # looper()
     # optimize()
     # print(len(df.index))
