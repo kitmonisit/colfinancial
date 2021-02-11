@@ -1,3 +1,6 @@
+# Clear terminal
+# https://stackoverflow.com/questions/2084508/clear-terminal-in-python#comment85748431_2084521
+
 import sys
 
 sys.path.append("./")
@@ -9,6 +12,9 @@ from core.transaction import Transaction, TxnType
 from pyinstrument import Profiler
 
 DIR = "./sandbox/LEDGER"
+
+def clear():
+    print(chr(27) + "c" + chr(27) + "[3J" + chr(27) + "[H" + chr(27) + "[2J", end="")
 
 
 def display(df):
@@ -28,6 +34,7 @@ def runner():
 
 
 def main():
+    clear()
     df = runner()
     cols = ["date", "secu", "shares", "price", "gross_amount"]
     cols = df.columns
