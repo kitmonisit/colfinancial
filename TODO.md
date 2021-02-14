@@ -47,3 +47,4 @@ bugfix
     - dataframe postprocessing
     - JSON output
 
+[modeline]: # vim:tw=80 colorcolumn=80
