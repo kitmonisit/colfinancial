@@ -77,8 +77,8 @@ class Ledger(SingleStream):
         .. code-block:: python
 
            DIR = "./ledger"
-           ledger = Ledger(DIR)
-           df = ledger.dataframe
+           with Ledger(DIR) as ledger:
+               df = ledger.dataframe
         """
         self.DIR = Path(ledger_dir)
         self.dispatch = {
@@ -94,9 +94,12 @@ class Ledger(SingleStream):
 
     @property
     def dataframe(self):
-        with self:
-            df = pd.DataFrame.from_records(self.__consolidate())
-        return df
+        try:
+            return self.__dataframe
+        except AttributeError:
+            with self:
+                self.__dataframe = pd.DataFrame.from_records(self.__consolidate())
+            return self.__dataframe
 
     def __consolidate(self):
         p = peekable(self)

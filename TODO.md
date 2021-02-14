@@ -35,10 +35,10 @@ bugfix
 
 ## core
 
-- `alpha_v1` DataFrame postprocessing
+- DONE `alpha_v1` DataFrame postprocessing
 
-    - one transaction reference, multiple lines. i.e. one transaction, multiple
-      prices matched
+    - DONE one transaction reference, multiple lines. i.e. one transaction,
+      multiple prices matched
 
 - `alpha_v1.1` Pipeline architecture
 
