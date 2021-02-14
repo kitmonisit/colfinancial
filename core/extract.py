@@ -1,4 +1,5 @@
 import io
+import numpy as np
 import pandas as pd
 
 from enum import Enum
@@ -94,8 +95,46 @@ class Ledger(SingleStream):
     @property
     def dataframe(self):
         with self:
-            df = pd.DataFrame.from_records(self)
+            df = pd.DataFrame.from_records(self.__consolidate())
         return df
+
+    def __consolidate(self):
+        p = peekable(self)
+        for current_record in p:
+            single_transaction = [
+                current_record,
+            ]
+            if current_record["action"] in (TxnType.BUY, TxnType.SELL):
+                # If `ref` is None, it has already been accounted for by the
+                # peeking routine
+                if current_record["ref"] is None:
+                    continue
+
+                # Keep on peeking further as long as `ref` remains None and `secu`
+                # remains the same
+                peek_idx = 0
+                while True:
+                    try:
+                        next_record = p[peek_idx]
+                    except IndexError:
+                        break
+                    if (
+                        next_record["secu"] == current_record["secu"]
+                        and next_record["ref"] is None
+                    ):
+                        single_transaction.append(next_record)
+                    else:
+                        break
+                    peek_idx += 1
+
+            if len(single_transaction) == 1:
+                yield current_record
+            else:
+                shares = np.array([record["shares"] for record in single_transaction])
+                price = np.array([record["price"] for record in single_transaction])
+                current_record["shares"] = np.sum(shares)
+                current_record["price"] = np.ma.average(a=price, weights=shares)
+                yield current_record
 
     def __next__(self):
         while True:

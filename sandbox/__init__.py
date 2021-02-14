@@ -36,48 +36,14 @@ def runner():
     return df
 
 
-def consolidate(df):
-    p = peekable(df.iterrows())
-    for idx, current_record in p:
-        following = [
-            current_record,
-        ]
-        if current_record["action"] in (TxnType.BUY, TxnType.SELL):
-            if current_record["ref"] is None:
-                continue
-            peek_idx = 0
-            while True:
-                try:
-                    _, next_record = p[peek_idx]
-                except IndexError:
-                    break
-                if (
-                    next_record["secu"] == current_record["secu"]
-                    and next_record["ref"] is None
-                ):
-                    following.append(next_record)
-                else:
-                    break
-                peek_idx += 1
-        if len(following) == 1:
-            yield current_record
-        else:
-            shares = np.array([record["shares"] for record in following])
-            price = np.array([record["price"] for record in following])
-            args = current_record.to_dict()
-            args["shares"] = np.sum(shares)
-            args["price"] = np.ma.average(a=price, weights=shares)
-            yield pd.Series(args)
-
-
 def main():
     clear()
     df = runner()
+    display(df)
     # cols = ["date", "action", "ref", "secu", "shares", "price", "gross_amount"]
     # cols = df.columns
     # df = df[cols].iloc[50:101]
-    df = pd.DataFrame.from_records(consolidate(df))
-    display(df)
+    # df = pd.DataFrame.from_records(consolidate(df))
     # df_iter = df[cols].iloc[50:101].iterrows()
     # p = peekable(df_iter)
     # print(p.peek())
