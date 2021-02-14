@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "traders_ledger"
+version = "0.1.0"
+description = "A trading performance dashboard straight from your account ledger."
+authors = ["Kit Monisit <kmonisit@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+numpy = "^1.20.1"
+pandas = "^1.2.2"
+more-itertools = "^8.7.0"
+
+[tool.poetry.dev-dependencies]
+watchgod = "^0.7"
+pipreqs = "^0.4.10"
+pyinstrument = "^3.3.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

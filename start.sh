@@ -1,3 +1,3 @@
-#/bin/env bash
+#/usr/bin/zsh
 
 watchgod sandbox.main
